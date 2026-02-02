@@ -19,9 +19,16 @@ resource "aws_iam_role_policy" "permissions" {
     Statement = [
       {
         Effect = "Allow",
-        Action = ["ec2:Describe*", "ec2:DeleteVolume", "ec2:ReleaseAddress"],
+        # UPDATE THIS LIST: Added cloudwatch:GetMetricStatistics
+        Action = [
+          "ec2:Describe*", 
+          "ec2:DeleteVolume", 
+          "ec2:ReleaseAddress",
+          "cloudwatch:GetMetricStatistics" 
+        ],
         Resource = "*"
       },
+      
       {
         Effect = "Allow",
         Action = ["dynamodb:*"],

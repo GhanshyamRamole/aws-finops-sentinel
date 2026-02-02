@@ -13,3 +13,6 @@ variable "slack_webhook_url" {
   type        = string
   sensitive   = true 
 }
+
+variable "role_arn" {}
+variable "table_name" {}
