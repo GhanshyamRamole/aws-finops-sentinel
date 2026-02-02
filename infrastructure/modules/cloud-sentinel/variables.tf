@@ -14,5 +14,4 @@ variable "slack_webhook_url" {
   sensitive   = true 
 }
 
-variable "role_arn" {}
-variable "table_name" {}
+
