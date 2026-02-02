@@ -1,78 +1,96 @@
 import boto3
 import os
+import time
 import json
-import urllib3
-from datetime import datetime
+import urllib.request
 from boto3.dynamodb.conditions import Attr
 
 # Configuration
-DYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']
 SLACK_WEBHOOK_URL = os.environ['SLACK_WEBHOOK_URL']
+DYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']
 REGION = os.environ['AWS_REGION']
 
 dynamodb = boto3.resource('dynamodb', region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
-http = urllib3.PoolManager()
 
 def lambda_handler(event, context):
     print("📢 Starting CloudSentinel Notifier...")
     
-    # 1. Scan DynamoDB for items in 'GracePeriod'
-    # In production, use a GSI (Global Secondary Index) for performance, 
-    # but a Scan is fine for this portfolio scale.
+    current_time = int(time.time())
+    
+    # Scan for all items in 'GracePeriod'
     response = table.scan(
         FilterExpression=Attr('Status').eq('GracePeriod')
     )
     items = response.get('Items', [])
     
     if not items:
-        print("✅ No items pending deletion.")
-        return {"status": "No notifications needed"}
+        print("✅ No waste found. Skipping Slack alert.")
+        return {"status": "No Waste Found"}
 
-    # 2. Build the Slack Message Payload
+    # Calculate Total Waste
+    total_waste = sum(float(i.get('EstimatedMonthlyWaste', 0)) for i in items)
+    
+    # Build Slack Block Message
     blocks = [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": "🚨 CloudSentinel: Resources Marked for Deletion"
+                "text": f"🚨 CloudSentinel Report: ${total_waste:.2f}/mo Potential Savings"
             }
         },
-        {
-            "type": "divider"
-        }
+        {"type": "divider"}
     ]
-
-    current_time = datetime.now().timestamp()
 
     for item in items:
         resource_id = item['ResourceId']
+        resource_type = item.get('ResourceType', 'Resource')
         delete_at = int(item['DeleteAt'])
-        waste_cost = item.get('EstimatedMonthlyWaste', '0.00')
+        cost = float(item.get('EstimatedMonthlyWaste', 0))
         
-        # Calculate days remaining
+        # Calculate Time Left
         days_left = int((delete_at - current_time) / 86400)
         
-        # Color urgency (Emoji)
-        icon = "🟢" if days_left > 3 else "🔴"
+        # --- ICON LOGIC ---
+        if resource_type == 'EBS_Volume':
+            type_icon = "💾"
+        elif resource_type == 'Elastic_IP':
+            type_icon = "🌐"
+        elif resource_type == 'EC2_Idle':
+            type_icon = "💤"
+        elif resource_type == 'EBS_Snapshot':
+            type_icon = "📸"
+        elif resource_type == 'Log_Group':
+            type_icon = "📜"
+        elif resource_type == 'Orphaned_LB':
+            type_icon = "⚖️"
+        else:
+            type_icon = "📦"
+
+        # Urgency Indicator
+        urgency_icon = "🟢" if days_left > 3 else "🔴"
         
         row = {
             "type": "section",
             "fields": [
-                {"type": "mrkdwn", "text": f"*{icon} ID:* `{resource_id}`"},
-                {"type": "mrkdwn", "text": f"*Est. Waste:* ${waste_cost}/mo"},
-                {"type": "mrkdwn", "text": f"*Action:* Delete in {days_left} days"}
+                {"type": "mrkdwn", "text": f"*{type_icon} {resource_type}*\n`{resource_id}`"},
+                {"type": "mrkdwn", "text": f"*Waste:* ${cost:.2f}/mo\n*{urgency_icon} Action:* Cleanup in {days_left} days"}
             ]
         }
         blocks.append(row)
 
-    # 3. Send to Slack
-    msg = {
-        "blocks": blocks
-    }
-    
-    encoded_msg = json.dumps(msg).encode('utf-8')
-    resp = http.request('POST', SLACK_WEBHOOK_URL, body=encoded_msg)
-    
-    print(f"📨 Notification sent. Status Code: {resp.status}")
-    return {"status": "Notification Sent", "count": len(items)}
+    # Send to Slack
+    payload = {"blocks": blocks}
+    req = urllib.request.Request(
+        SLACK_WEBHOOK_URL, 
+        data=json.dumps(payload).encode('utf-8'), 
+        headers={'Content-Type': 'application/json'}
+    )
+    try:
+        urllib.request.urlopen(req)
+        print("✅ Slack notification sent.")
+    except Exception as e:
+        print(f"❌ Failed to send Slack alert: {e}")
+
+    return {"status": "Notification Sent"}
