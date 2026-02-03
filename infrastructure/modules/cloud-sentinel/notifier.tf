@@ -1,24 +1,20 @@
-
-	# notify user before deleting any resources
-
 data "archive_file" "notifier_zip" {
   type        = "zip"
   source_dir  = "${path.module}/../../../src"
   output_path = "${path.module}/notifier_payload.zip"
 }
 
-# --- Schedule: 9:00 AM (Between Scan and Clean) ---
+# --- Schedule: 9:00 AM (Uses the variable from locals.tf) ---
 resource "aws_cloudwatch_event_rule" "daily_report" {
   name                = "${var.project_name}-Daily-Report-${var.environment}"
-  schedule_expression = "cron(0 9 * * ? *)"
+  schedule_expression = local.report_schedule  # <--- Uses local!
 }
 
 resource "aws_lambda_function" "notifier" {
   filename         = data.archive_file.notifier_zip.output_path
   function_name    = "${var.project_name}-Notifier-${var.environment}"
   
-  # FIX: Direct Reference to security.tf
-  role             = aws_iam_role.lambda_role.arn
+  role             = local.role_arn  # <--- Uses local!
   
   handler          = "common/slack_notifier.lambda_handler"
   runtime          = "python3.9"
@@ -27,8 +23,7 @@ resource "aws_lambda_function" "notifier" {
 
   environment {
     variables = {
-      
-      DYNAMODB_TABLE    = aws_dynamodb_table.this.name
+      DYNAMODB_TABLE    = local.table_name # <--- Uses local!
       SLACK_WEBHOOK_URL = aws_ssm_parameter.slack_webhook.value
     }
   }
