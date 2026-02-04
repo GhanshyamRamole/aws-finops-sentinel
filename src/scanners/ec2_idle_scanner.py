@@ -1,7 +1,7 @@
 import boto3
 import os
 import datetime
-from src.common.dynamo_helper import DynamoHelper
+from common.dynamo_helper import DynamoHelper
 
 DYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']
 REGION = os.environ['AWS_REGION']

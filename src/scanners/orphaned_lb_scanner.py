@@ -1,6 +1,6 @@
 import boto3
 import os
-from src.common.dynamo_helper import DynamoHelper
+from common.dynamo_helper import DynamoHelper
 
 DYNAMODB_TABLE = os.environ['DYNAMODB_TABLE']
 REGION = os.environ['AWS_REGION']
