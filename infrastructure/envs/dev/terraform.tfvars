@@ -2,3 +2,4 @@ project_name      = "CloudSentinel"
 environment       = "dev"
 region		  = "us-east-1"
 slack_webhook_url = "https://hooks.slack.com/services/YOUR/ACTUAL/WEBHOOK"
+

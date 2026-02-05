@@ -1,4 +1,3 @@
-
 	# IAM Roles for lambda permission
 
 resource "aws_iam_role" "lambda_role" {
@@ -19,7 +18,29 @@ resource "aws_iam_role_policy" "permissions" {
     Statement = [
       {
         Effect = "Allow",
-        Action = ["ec2:Describe*", "ec2:DeleteVolume", "ec2:ReleaseAddress"],
+        # UPDATE: Added permissions for Snapshots, Logs, and Load Balancers
+        Action = [
+          # EC2 Core (Instances, Volumes, IPs)
+          "ec2:Describe*", 
+          "ec2:DeleteVolume", 
+          "ec2:ReleaseAddress",
+          
+          # Snapshots
+          "ec2:DeleteSnapshot",
+          
+          # CloudWatch Metrics (for Idle Scanner)
+          "cloudwatch:GetMetricStatistics",
+          
+          # CloudWatch Logs (for Retention Scanner)
+          "logs:DescribeLogGroups",
+          "logs:PutRetentionPolicy",
+          
+          # Load Balancers (for Orphaned LB Scanner)
+          "elasticloadbalancing:DescribeLoadBalancers",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeTargetHealth",
+          "elasticloadbalancing:DeleteLoadBalancer"
+        ],
         Resource = "*"
       },
       {
